@@ -28,7 +28,14 @@ function Test-MtContext {
             # Do not include Mail.Send for applications. Not compatible with Exchange Online RBAC for Applications
             Get-MtGraphScope -SendTeamsMessage:$SendTeamsMessage
         }
-        $currentScopes = $context.Scopes
+        # For delegated auth, permissions are in .Scopes; for app-only (certificate/secret)
+        # they are in .Roles (application permissions granted in Entra).
+        $currentScopes = if ($context.AuthType -eq 'Delegated') {
+            $context.Scopes
+        } else {
+            # Combine both in case the SDK populates either property
+            @($context.Scopes) + @($context.Roles) | Where-Object { $_ }
+        }
         $missingScopes = $requiredScopes | Where-Object { $currentScopes -notcontains $_ -and $currentScopes -notcontains ($_ -replace '.Read.', '.ReadWrite.') }
 
         if ($missingScopes) {
